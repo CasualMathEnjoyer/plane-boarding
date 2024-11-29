@@ -1,9 +1,7 @@
 # plane-boarding
 colaboration project modeling boarding of a plane
 
-# Michal
-
-# Simulace Pasažérů při Nástupu do Letadla
+# Michal - Simulace Pasažérů při Nástupu do Letadla
 
 ## Funkce
 
