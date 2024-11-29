@@ -2,7 +2,7 @@ import numpy as np
 import pygame
 import sys
 import random
-from collections import deque
+from collections import deque, defaultdict
 import argparse
 
 # Funkce pro výpočet distance matrix pomocí BFS
@@ -209,8 +209,7 @@ class Passenger:
             self.current_pos = self.next_move
         else:
             # Pokud by se 'next_move' dostalo do 'None', zůstat na místě
-            print(f"Warning: Passenger {self.ped_id} has next_move set to None. Resetting to current_pos.")
-        self.next_move = None
+            print(f"Warning: Passenger {self.ped_id} has next_move set to None or invalid. Staying in place.")
 
 # Třída Simulation pro správu simulace a Pygame
 class Simulation:
@@ -329,8 +328,8 @@ class Simulation:
                     baggage_probability=self.baggage_probability
                 )
                 self.passengers.append(passenger)
+                print(f"Spawning passenger {self.ped_id_counter} at door {door} with seat {seat}")
                 self.ped_id_counter += 1
-                print(f"Spawning passenger {self.ped_id_counter - 1} at door {door} with seat {seat}")
 
     def resolve_conflicts(self, move_requests):
         """
@@ -344,6 +343,17 @@ class Simulation:
                     if ped != chosen_ped:
                         ped.next_move = ped.current_pos  # Zůstat na místě
                         print(f"Passenger {ped.ped_id} blocked from moving to {pos}")
+
+    def apply_moves(self):
+        """
+        Aplikuje schválené pohyby pasažérů.
+        """
+        for passenger in self.passengers:
+            passenger.move()
+            # Kontrola, zda pasažér dosáhl sedadla
+            if passenger.current_pos == passenger.seat_pos and not passenger.seated:
+                passenger.seated = True
+                print(f"Passenger {passenger.ped_id} seated at {passenger.seat_pos}")
 
     def run(self):
         running = True
@@ -366,30 +376,16 @@ class Simulation:
                 passenger.decide_move(occupied_positions)
 
             # Shromáždění požadavků na pohyb
-            move_requests = {}
+            move_requests = defaultdict(list)
             for passenger in self.passengers:
-                desired_pos = passenger.next_move
-                # Zajištění, že desired_pos není None
-                if desired_pos is None:
-                    desired_pos = passenger.current_pos
-                    passenger.next_move = desired_pos
-                    print(f"Passenger {passenger.ped_id} had next_move set to None. Resetting to current_pos {desired_pos}")
-                if desired_pos != passenger.current_pos:  # Ignorovat požadavky zůstat na místě
-                    if desired_pos not in move_requests:
-                        move_requests[desired_pos] = [passenger]
-                    else:
-                        move_requests[desired_pos].append(passenger)
+                if passenger.next_move != passenger.current_pos and not passenger.seated:
+                    move_requests[passenger.next_move].append(passenger)
 
-            # Konfliktní rezoluce
+            # Řešení konfliktů
             self.resolve_conflicts(move_requests)
 
-            # Pohyb pasažérů
-            for passenger in self.passengers:
-                passenger.move()
-                # Kontrola, zda pasažér dosáhl sedadla
-                if passenger.current_pos == passenger.seat_pos and not passenger.seated:
-                    passenger.seated = True
-                    print(f"Passenger {passenger.ped_id} seated at {passenger.seat_pos}")
+            # Aplikace pohybů
+            self.apply_moves()
 
             # Vykreslení
             self.screen.fill((0, 0, 0))
@@ -413,7 +409,7 @@ class Simulation:
 
             pygame.display.flip()
 
-            # Kontrola, zda jsou všechny pasažéři seated
+            # Kontrola, zda jsou všichni pasažéři seated
             if not self.available_seats and all(p.seated for p in self.passengers):
                 print("Všichni pasažéři byli přiřazeni a dosáhli svých sedadel.")
                 running = False
