@@ -142,6 +142,11 @@ class Passenger:
         self.next_move = spawn_pos  # Inicializace next_move na spawn_pos
         self.seated = False  # Stav pasažéra
 
+        self.desired_move = None  # a space where a passenger wants to move but can't because another passenger is standing there
+        self.swapping = False
+        self.swapping_speed = random.randint(1, 3)
+        self.swapping_progress = None
+
         # Přiřazení zavazadla s pravděpodobností
         self.has_baggage = random.random() < baggage_probability
         if self.has_baggage:
@@ -151,7 +156,7 @@ class Passenger:
             self.baggage_steps_remaining = 0
             self.baggage_stopped = False
 
-    def decide_move(self, occupied_positions):
+    def decide_move(self, occupied_positions, blocked_passengers):
         if self.seated:
             self.next_move = self.current_pos  # Zůstat na místě, pokud je již seated
             return
@@ -176,6 +181,18 @@ class Passenger:
             self.next_move = self.current_pos  # Zůstat na místě
             return  # Nechce se pohybovat
 
+        if self.swapping:
+            self.swapping_progress -= 1
+            print(f"Passenger {self.ped_id} swapping, steps remaining: {self.swapping_progress}")
+            if self.swapping_progress == 0:
+                print(f"Passenger {self.ped_id} swapped")
+                self.next_move = self.desired_move
+                self.desired_move = None
+                self.swapping_progress = None
+                self.swapping = False
+            return
+
+
         x, y = self.current_pos
         min_dist = self.distance_matrix[x, y]
         candidates = []
@@ -190,17 +207,25 @@ class Passenger:
             nx, ny = x + dx, y + dy
             if (0 <= nx < self.distance_matrix.shape[0] and
                 0 <= ny < self.distance_matrix.shape[1] and
-                self.distance_matrix[nx, ny] != np.inf and
-                (nx, ny) not in occupied_positions):
-                if self.distance_matrix[nx, ny] < min_dist:
-                    min_dist = self.distance_matrix[nx, ny]
-                    candidates = [(nx, ny)]
-                elif self.distance_matrix[nx, ny] == min_dist:
-                    candidates.append((nx, ny))
+                self.distance_matrix[nx, ny] != np.inf):
+                    if self.distance_matrix[nx, ny] < min_dist:
+                        if (nx, ny) in occupied_positions:
+                            self.desired_move = (nx, ny)
+                            blocked_passengers[self.current_pos] = self
+                        else:  # if there isn't a passenger standing
+                            min_dist = self.distance_matrix[nx, ny]
+                            candidates = [(nx, ny)]
+                    elif self.distance_matrix[nx, ny] == min_dist:
+                        candidates.append((nx, ny))
         if candidates:
             self.next_move = random.choice(candidates)
+
+            # clean-up
+            if self.current_pos in blocked_passengers: del blocked_passengers[self.current_pos]
+            self.desired_move = None  # the passenger moved so they aren't in a conflict
+            self.swapping = False  # found a place to move so can't be swapping
         else:
-            # Pokud nejsou žádné kandidáty, zůstat na místě
+            # Pokud nejsou žádni kandidáti, zůstat na místě
             print(f"Passenger {self.ped_id} has no valid moves and stays at {self.current_pos}")
             self.next_move = self.current_pos  # Zůstat na místě
 
@@ -270,6 +295,7 @@ class Simulation:
         self.passenger_color = (255, 165, 0)  # Oranžová
         self.seated_color = (0, 255, 0)      # Zelená
         self.storing_color = (0, 255, 255)   # Azurová (pro ukládání zavazadel)
+        self.swapping_color = (255, 100, 200)  # Switching protijdouci
 
         # Inicializace fontů
         pygame.font.init()
@@ -294,14 +320,61 @@ class Simulation:
                 color = self.seated_color
             elif passenger.has_baggage and passenger.baggage_stopped:
                 color = self.storing_color
+            elif passenger.swapping:
+                color = self.swapping_color
             else:
                 color = self.passenger_color
+
+            center_x = int(y * self.cell_size + self.cell_size / 2)
+            center_y = int(x * self.cell_size + self.cell_size / 2) + 100  # Offset by 100 for the bar
+
             pygame.draw.circle(
                 self.screen,
                 color,
-                (int(y * self.cell_size + self.cell_size / 2), int(x * self.cell_size + self.cell_size / 2) + 100),
+                (center_x, center_y),
                 self.cell_size // 3
             )
+            if passenger.has_baggage and passenger.baggage_steps_remaining is not 0:
+                baggage_size = self.cell_size // 4
+                square_x = center_x - baggage_size // 2
+                square_y = center_y + self.cell_size // 4
+                pygame.draw.rect(
+                    self.screen,
+                    (0, 0, 155),  # Baggage color
+                    (square_x, square_y, baggage_size, baggage_size)
+                )
+
+            if passenger.swapping and passenger.desired_move:
+                desired_x, desired_y = passenger.desired_move
+                desired_center_x = int(desired_y * self.cell_size + self.cell_size / 2)
+                desired_center_y = int(desired_x * self.cell_size + self.cell_size / 2) + 100
+
+                arrow_length, arrow_width = 10, 2
+                arrow_color = (0, 0, 0)
+
+                def draw_arrowhead(start, end, color, width, length=10):
+                    angle = np.arctan2(end[1] - start[1], end[0] - start[0])
+                    point1 = (
+                        end[0] - length * np.cos(angle - np.pi / 6),
+                        end[1] - length * np.sin(angle - np.pi / 6)
+                    )
+                    point2 = (
+                        end[0] - length * np.cos(angle + np.pi / 6),
+                        end[1] - length * np.sin(angle + np.pi / 6)
+                    )
+                    pygame.draw.polygon(self.screen, color, [end, point1, point2])
+
+                pygame.draw.line(
+                    self.screen,
+                    arrow_color,
+                    (center_x, center_y),
+                    (desired_center_x, desired_center_y),
+                    arrow_width
+                )
+                draw_arrowhead((center_x, center_y), (desired_center_x, desired_center_y), arrow_color, arrow_width,
+                               arrow_length)
+                draw_arrowhead((desired_center_x, desired_center_y), (center_x, center_y), arrow_color, arrow_width,
+                               arrow_length)
 
     def spawn_passengers(self):
         """
@@ -344,6 +417,28 @@ class Simulation:
                         ped.next_move = ped.current_pos  # Zůstat na místě
                         print(f"Passenger {ped.ped_id} blocked from moving to {pos}")
 
+    def resolve_swapping(self, blocked_passengers):
+        """
+        Resi konflikt typu chodec A chce jit na pozici chodce B
+        a chodec B na pozici chodce A
+        Kazdy chodec ma cas, ktery mu trva se vymenit - vybere nejvetsi z casu a zapocne odpocet casu prohozeni
+        """
+        if blocked_passengers:
+            for current_pos in blocked_passengers:
+                this_passenger = blocked_passengers[current_pos]
+                if this_passenger.swapping: continue
+                if this_passenger.desired_move in blocked_passengers:
+                    other_passenger = blocked_passengers[this_passenger.desired_move]
+                    if other_passenger.desired_move == current_pos:
+                        assert this_passenger.desired_move == other_passenger.current_pos
+                        assert other_passenger.desired_move == current_pos
+                        this_passenger.swapping = True
+                        other_passenger.swapping = True
+                        time_to_swap = max(this_passenger.swapping_speed, other_passenger.swapping_speed)
+                        this_passenger.swapping_progress = time_to_swap
+                        other_passenger.swapping_progress = time_to_swap
+                        print(f"Passenger {this_passenger.ped_id} is swapping with {other_passenger.ped_id} for duration: {time_to_swap}")
+
     def apply_moves(self):
         """
         Aplikuje schválené pohyby pasažérů.
@@ -372,8 +467,11 @@ class Simulation:
 
             # Rozhodování o pohybu
             occupied_positions = {p.current_pos for p in self.passengers if not p.seated}
+            blocked_passengers = {}  # current_position : passenger - implemented to resolve passenger <-> passenger conflicts
             for passenger in self.passengers:
-                passenger.decide_move(occupied_positions)
+                passenger.decide_move(occupied_positions, blocked_passengers)
+
+            self.resolve_swapping(blocked_passengers)
 
             # Shromáždění požadavků na pohyb
             move_requests = defaultdict(list)
@@ -423,14 +521,14 @@ class Simulation:
 # Funkce pro načtení konfigurace od uživatele
 def get_user_configuration():
     parser = argparse.ArgumentParser(description="Airplane Passenger Simulation Parameters")
-    parser.add_argument('--seat_rows', type=int, default=32, help='Number of seat rows in the airplane')
+    parser.add_argument('--seat_rows', type=int, default=5, help='Number of seat rows in the airplane')
     parser.add_argument('--seat_in_row', type=int, nargs='+', default=[3, 3],
                         help='Number of seats in each section (e.g., 3 3)')
-    parser.add_argument('--door_choice', type=str, choices=['left', 'right', 'both'], default='left',
+    parser.add_argument('--door_choice', type=str, choices=['left', 'right', 'both'], default='both',
                         help='Choice of door(s) for passenger spawning')
     parser.add_argument('--baggage_probability', type=float, default=0.6,
                         help='Probability that a passenger has baggage (0.0 - 1.0)')
-    parser.add_argument('--ticks_per_second', type=int, default=10,
+    parser.add_argument('--ticks_per_second', type=int, default=3,
                         help='Number of simulation ticks (frames) per second')
 
     args = parser.parse_args()
@@ -440,6 +538,9 @@ def get_user_configuration():
 if __name__ == "__main__":
     # Načtení konfigurace
     args = get_user_configuration()
+
+    random.seed(42)
+    np.random.seed(42)
 
     # Vytvoření a spuštění simulace
     simulation = Simulation(

@@ -22,18 +22,24 @@ colaboration project modeling boarding of a plane
 
 ### 2. Třída `Passenger`
 
-- **Účel**: Reprezentuje jednotlivého pasažéra v simulaci.
+- **Účel**: Reprezentuje jednotlivé pasažéry v simulaci.
 - **Atributy**:
-  - `ped_id`: Jedinečné ID pasažéra.
+  - `ped_id`: ID pasažéra.
   - `current_pos`: Aktuální pozice pasažéra v matici.
   - `seat_pos`: Přiřazená pozice sedadla.
   - `has_baggage`: Informace o tom, zda pasažér má zavazadlo.
   - `baggage_steps_remaining`: Počet kroků potřebných k uložení zavazadla.
   - `seated`: Stav, zda je pasažér již usazen.
+  - `desired_move`: Pozice, kam se pasažér chce posunout, ale je obsazená.
+  - `swapping`: Stav, kdy se pasažér vyměňuje s jiným pasažérem..
+  - `swapping_speed`: Rychlost výměny při vyměňování v uličce.
+  - `swapping_progress`: Počet kroků potřebných k dokončení výměny.
+  
 - **Logika Pohybu**:
   - Pasažéři se rozhodují o svém dalším kroku na základě nejkratší cesty k sedadlu.
   - Pokud má pasažér zavazadlo, zastaví se a uloží ho před pokračováním k sedadlu.
   - Konfliktní situace jsou řešeny tak, že pouze jeden pasažér může vstoupit do konkurenční buňky najednou.
+  - Pokud jdou dva pasažéři proti sobě, vymění se.
 
 ### 3. Třída `Simulation`
 
@@ -43,6 +49,7 @@ colaboration project modeling boarding of a plane
   - `draw_grid`: Vykresluje matici letadla a pasažéry na obrazovce.
   - `spawn_passengers`: Spawnuje nové pasažéry na dveřích, pokud jsou buňky dveří volné a jsou k dispozici sedadla.
   - `resolve_conflicts`: Řeší konflikty, kdy více pasažérů chce vstoupit do stejné buňky, tím, že náhodně vybere jednoho, který může pokračovat.
+  - `resolve_swapping`: Řeší konflikty, kdy jdou dva pasažéri proti sobě a musi se vyměnit v uličce.
   - `run`: Hlavní smyčka simulace, která zpracovává události, spawnuje pasažéry, aktualizuje jejich pohyb, vykresluje scénu a kontroluje ukončení simulace.
 
 ### 4. Funkce `compute_distance_matrix`
@@ -60,6 +67,8 @@ colaboration project modeling boarding of a plane
   - **Oranžová**: Aktivní pasažéři, kteří se pohybují k sedadlům.
   - **Zelená**: Usazení pasažéři.
   - **Azurová**: Pasažéři ukládající zavazadla.
+  - **Růžová**: Pasažéři, kteří se právě vyměňují v uličce.
+- **Zavazadlo**: Pasažéři, kteri u sebe maji male příruční zavazadlo (zobrazeno modrým čtverečkem).
 
 ## Ukončení Simulace
 
