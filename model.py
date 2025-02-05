@@ -1,8 +1,8 @@
 from random import randint
 
 import numpy as np
+import matplotlib.pyplot as plt
 import pygame
-import sys
 import random
 from collections import deque, defaultdict
 import argparse
@@ -280,13 +280,16 @@ class Passenger:
 # Třída Simulation pro správu simulace a Pygame
 class Simulation:
     def __init__(self, seat_rows=32, seat_in_row=[3, 3], door_choice='left',
-                 baggage_probability=0.6, ticks_per_second=10):
+                 baggage_probability=0.6, ticks_per_second=10,
+                 seating_strategy='random'):
         # Nastavení parametrů
         self.seat_rows = seat_rows
         self.seat_in_row = seat_in_row
         self.door_choice = door_choice
         self.baggage_probability = baggage_probability
         self.ticks_per_second = ticks_per_second
+        self.seating_strategy = seating_strategy
+        self.passenger_seated_at = [];
 
         # Inicializace Airplane
         self.airplane = Airplane(seat_rows=self.seat_rows,
@@ -299,7 +302,19 @@ class Simulation:
 
         # Inicializace pasažérů
         self.available_seats = self.seat_positions.copy()
-        random.shuffle(self.available_seats)
+
+        # Řazení pasažérů do optimální podoby
+        midpoint = int(np.floor(len(self.available_seats) / 2))
+        self.available_seats.sort(key=lambda x: x[1])
+
+        # Rozdělení letadla na přední a zadní část
+        self.available_seats_split = [
+            self.available_seats[:midpoint],  # Left half
+            self.available_seats[midpoint:]  # Right half
+        ]
+        self.available_seats_split[0].sort(key=lambda x: (x[1], -x[0] if x[0] <= seat_in_row[0] else x[0]))
+        self.available_seats_split[1].sort(key=lambda x: (-x[1], -x[0] if x[0] <= seat_in_row[0] else x[0]))
+
         self.passengers = []
         self.seat_status = {seat: False for seat in self.seat_positions}  # False = unoccupied
         self.ped_id_counter = 0
@@ -421,7 +436,44 @@ class Simulation:
                 draw_arrowhead((desired_center_x, desired_center_y), (center_x, center_y), arrow_color, arrow_width,
                                arrow_length)
 
-    def spawn_passengers(self):
+    def get_seat_by_priority(self, available_seats, seat_priority=[7, 1, 6, 2, 5, 3]):
+        for priority in seat_priority:
+            seats = [t for t in available_seats if t[0] == priority]
+            if len(seats) != 0:
+                selected_seat = random.choice(seats)
+                available_seats.remove(selected_seat)  # Remove from list
+                return selected_seat
+
+    def assign_seat(self, door, seating_strategy='random'):
+        if seating_strategy == 'random':
+            return self.available_seats.pop(random.randrange(len(self.available_seats)))
+        if seating_strategy == 'door_wise':
+            if len(self.door_positions) == 1:
+                return self.available_seats.pop(random.randrange(len(self.available_seats)))
+            else:
+                door_id = 0 if door[1] == 1 else 1
+                if len(self.available_seats_split[door_id]) > 0:
+                    seat_to_assign = self.available_seats_split[door_id].pop(random.randrange(len(self.available_seats_split[door_id])))
+                    self.available_seats.remove(seat_to_assign)
+                    return seat_to_assign
+                else:
+                    return None
+        if seating_strategy == 'window_wise':
+            return self.get_seat_by_priority(self.available_seats)
+        if seating_strategy == 'optimal':
+            if len(self.door_positions) == 1:
+                return self.available_seats.pop(random.randrange(len(self.available_seats)))
+            else:
+                door_id = 0 if door[1] == 1 else 1
+                if len(self.available_seats_split[door_id]) > 0:
+                    seat_to_assign = self.available_seats_split[door_id].pop()
+                    self.available_seats.remove(seat_to_assign)
+                    return seat_to_assign
+                else:
+                    return None
+
+
+    def spawn_passengers(self, seating_strategy):
         """
         Spawnuje pasažéry pouze tehdy, když je dveřní buňka volná.
         Pokračuje ve spawnování, dokud nejsou všichni pasažéři spawnováni.
@@ -431,7 +483,11 @@ class Simulation:
             door_occupied = any(p.current_pos == door and not p.seated for p in self.passengers)
             if not door_occupied and self.available_seats:
                 # Spawnujte nového pasažéra na dveřní buňku
-                seat = self.available_seats.pop()
+                seat = self.assign_seat(door, seating_strategy)
+
+                if seat is None:
+                    continue
+
                 try:
                     distance_matrix = compute_distance_matrix(self.matrix, seat)
                 except ValueError as e:
@@ -520,6 +576,7 @@ class Simulation:
             # Kontrola, zda pasažér dosáhl sedadla
             if passenger.current_pos == passenger.seat_pos and not passenger.seated:
                 passenger.seated = True
+                self.passenger_seated_at.append(pygame.time.get_ticks())
                 self.seat_status[passenger.seat_pos] = True  # Mark seat as occupied
                 print(f"Passenger {passenger.ped_id} seated at {passenger.seat_pos}")
 
@@ -535,7 +592,7 @@ class Simulation:
 
             # Spawn pasažérů na dveřích, pokud uplynul spawn_interval
             if current_time - self.last_spawn_time > self.spawn_interval:
-                self.spawn_passengers()
+                self.spawn_passengers(self.seating_strategy)
                 self.last_spawn_time = current_time
 
             # Rozhodování o pohybu
@@ -589,7 +646,7 @@ class Simulation:
             clock.tick(self.ticks_per_second)
 
         pygame.quit()
-        sys.exit()
+        return pygame.time.get_ticks(), self.passenger_seated_at
 
 # Funkce pro načtení konfigurace od uživatele
 def get_user_configuration():
@@ -601,9 +658,10 @@ def get_user_configuration():
                         help='Choice of door(s) for passenger spawning')
     parser.add_argument('--baggage_probability', type=float, default=0.6,
                         help='Probability that a passenger has baggage (0.0 - 1.0)')
-    parser.add_argument('--ticks_per_second', type=int, default=3,
+    parser.add_argument('--ticks_per_second', type=int, default=5,
                         help='Number of simulation ticks (frames) per second')
-
+    parser.add_argument('--seating_strategy', type=str, choices=['random', 'door_wise', 'window_wise', 'optimal'], default='optimal',
+                        help='Seating strategy')
     args = parser.parse_args()
     return args
 
@@ -621,6 +679,18 @@ if __name__ == "__main__":
         seat_in_row=args.seat_in_row,
         door_choice=args.door_choice,
         baggage_probability=args.baggage_probability,
-        ticks_per_second=args.ticks_per_second
+        ticks_per_second=args.ticks_per_second,
+        seating_strategy=args.seating_strategy
     )
-    simulation.run()
+    time_to_finish, passenger_seated_at = simulation.run()
+    print(f'Simulace ukončena po {time_to_finish} krocích.')
+
+    # Zobrazení grafu
+    num_passengers = list(range(1, len(passenger_seated_at) + 1))
+    plt.figure(figsize=(8, 5))
+    plt.plot(passenger_seated_at, num_passengers, marker='o', linestyle='-', linewidth=2, color='b')
+    plt.xlabel("Čas [ticks]")
+    plt.ylabel("Počet usazených pasažérů")
+    plt.title("Usazování pasažérů v čase")
+    plt.grid(True)
+    plt.show()

@@ -1,7 +1,7 @@
-# plane-boarding
-colaboration project modeling boarding of a plane
+# Simulace usazování pasažérů do letadla
+Cílem projektu je nasimulovat různé podmínky ovlivňující rychlost usazování pasažérů v letadle
 
-# Michal - Simulace Pasažérů při Nástupu do Letadla - (1 dveře, ukládání zavazadel, usednutí na místo)
+**_Autoři: Michal Průšek, Kateřina Morovicsová, Filip Širc_**
 
 ## Funkce
 
@@ -11,6 +11,7 @@ colaboration project modeling boarding of a plane
 - **Přizpůsobitelné Parametry**: Umožňuje nastavení počtu řad sedadel, počtu sedadel v každé sekci, volby dveří pro spawnování pasažérů, pravděpodobnosti, že pasažér má zavazadlo, a rychlosti simulace. Matice letadla se pak generuje adaptivně na základě prvních dvou zmíněných parametrů.
 - **Vizualizace v reálném čase**: Vizualizace procesu nástupu pomocí Pygame, zobrazující pasažéry, sedadla, uličky a dveře.
 - **Progress Bar**: Zobrazuje informace o celkovém počtu pasažérů, sedadel, pasažérů čekajících na spawnování a pasažérů aktuálně v simulaci.
+- **Různé strategie usazování**: Umožňuje nastavit strategii, se kterou jsou uživatelé usazování do letadla.
 
 ## Jak To Funguje
 
@@ -48,6 +49,12 @@ colaboration project modeling boarding of a plane
 
 - **Účel**: Řídí celou simulaci, včetně inicializace letadla, pasažérů a vizualizace pomocí Pygame.
 - **Inicializace**: Nastavuje prostředí simulace, včetně rozměrů okna Pygame, barev, fontů a časování.
+- **Strategie usazování**:
+  - `random`: Pasážeři jsou spawnování s náhodným sedadlem
+  - `window_wise`: Pasažéři jsou spawnováni tak, aby přednost měli Ti se sedadlem u okna".
+  - `door_wise`: Pasažéři jsou spawnováni tak, aby předními dveřmi šli Ti se sedadlem v přední části letadla".
+  - `door_wise`: Pasažéři jsou spawnováni tak, aby předními dveřmi šli Ti se sedadlem v přední části letadla a přednost měli Ti se sedadlem u okénka".
+
 - **Metody**:
   - `draw_grid`: Vykresluje matici letadla a pasažéry na obrazovce.
   - `spawn_passengers`: Spawnuje nové pasažéry na dveřích, pokud jsou buňky dveří volné a jsou k dispozici sedadla.
@@ -77,3 +84,16 @@ colaboration project modeling boarding of a plane
 ## Ukončení Simulace
 
 Simulace se ukončí, když jsou všichni pasažéři spawnováni a usazeni na svých sedadlech.
+
+## Zobrazení statistik
+Po ukončení simulace se vygeneruje graf ukazující usazování jednotlivých pasažérů v čase.
+<p align="center">
+    <figure align="center">
+      <img src="./plots/randomSeating.png" width="45%" />
+      <figcaption align="center">(Obr. 1) Náhodné usazování pasažérů</figcaption>
+    </figure>
+    <figure align="center">
+      <img src="./plots/optimalSeating.png" width="45%" />
+      <figcaption align="center">(Obr. 2) Usazování při zohlednění polohy sedadel vůči oknům a dveřím</figcaption>
+    </figure>
+</p>
