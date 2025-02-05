@@ -1,3 +1,5 @@
+from random import randint
+
 import numpy as np
 import pygame
 import sys
@@ -147,6 +149,9 @@ class Passenger:
         self.swapping_speed = random.randint(1, 3)
         self.swapping_progress = None
 
+        self.seating_in_progress = False
+        self.seating_steps_remaining = 0
+
         # Přiřazení zavazadla s pravděpodobností
         self.has_baggage = random.random() < baggage_probability
         if self.has_baggage:
@@ -156,7 +161,28 @@ class Passenger:
             self.baggage_steps_remaining = 0
             self.baggage_stopped = False
 
-    def decide_move(self, occupied_positions, blocked_passengers):
+    # Slouží k vyhodnocení, zda není požadované sedadlo blokované
+    # Např. pasažér sedící v uličce blokuje přístup k sedadlu u okna
+    def check_blocked_seats(self, current_pos, seat_pos, seat_status):
+        seat_row, seat_col = seat_pos
+        current_row, current_col = current_pos
+
+        if current_col != seat_col:
+            return False, 0
+
+        blocking_positions = []
+
+        for row in range(min(current_row, seat_row) + 1, max(current_row, seat_row)):
+            blocking_positions.append((row, seat_col))
+
+        blocking_count = 0
+        for pos in blocking_positions:
+            if seat_status[pos]:
+                blocking_count += 1
+
+        return blocking_count > 0, blocking_count
+
+    def decide_move(self, occupied_positions, blocked_passengers, seat_status):
         if self.seated:
             self.next_move = self.current_pos  # Zůstat na místě, pokud je již seated
             return
@@ -181,6 +207,22 @@ class Passenger:
             self.next_move = self.current_pos  # Zůstat na místě
             return  # Nechce se pohybovat
 
+        # Pokud se usazuje -> vyměňuje se s pasažárem na blokujícím sedadle
+        if self.seating_in_progress:
+            self.seating_steps_remaining -= 1
+            if self.seating_steps_remaining == 0:
+                self.seating_in_progress = False
+                self.next_move = self.seat_pos
+            return
+
+        seat_is_blocked, blocking_count = self.check_blocked_seats(self.current_pos, self.seat_pos, seat_status)
+        # Pokud je sedadlo blokované, doba do usazení se odvíjí od počtu blokujících pasažérů
+        if seat_is_blocked:
+            self.seating_in_progress = True
+            self.seating_steps_remaining = blocking_count * randint(3, 5)
+            self.next_move = self.current_pos
+            return
+
         if self.swapping:
             self.swapping_progress -= 1
             print(f"Passenger {self.ped_id} swapping, steps remaining: {self.swapping_progress}")
@@ -191,7 +233,6 @@ class Passenger:
                 self.swapping_progress = None
                 self.swapping = False
             return
-
 
         x, y = self.current_pos
         min_dist = self.distance_matrix[x, y]
@@ -260,6 +301,7 @@ class Simulation:
         self.available_seats = self.seat_positions.copy()
         random.shuffle(self.available_seats)
         self.passengers = []
+        self.seat_status = {seat: False for seat in self.seat_positions}  # False = unoccupied
         self.ped_id_counter = 0
 
         # Inicializace Pygame
@@ -295,6 +337,7 @@ class Simulation:
         self.passenger_color = (255, 165, 0)  # Oranžová
         self.seated_color = (0, 255, 0)      # Zelená
         self.storing_color = (0, 255, 255)   # Azurová (pro ukládání zavazadel)
+        self.seating_color = (255, 0, 0)  # Usazující se
         self.swapping_color = (255, 100, 200)  # Switching protijdouci
 
         # Inicializace fontů
@@ -322,6 +365,8 @@ class Simulation:
                 color = self.storing_color
             elif passenger.swapping:
                 color = self.swapping_color
+            elif passenger.seating_in_progress:
+                color = self.seating_color
             else:
                 color = self.passenger_color
 
@@ -404,6 +449,32 @@ class Simulation:
                 print(f"Spawning passenger {self.ped_id_counter} at door {door} with seat {seat}")
                 self.ped_id_counter += 1
 
+    # Dočasná funkce, slouží k testování správného fungování
+    def spawn_passengers_with_exact_positions(self, seat_positions):
+        if len(self.passengers) >= len(seat_positions):
+            return
+
+        door = self.door_positions[0]
+
+        for seat in seat_positions:
+            try:
+                distance_matrix = compute_distance_matrix(self.matrix, seat)
+            except ValueError as e:
+                print(f"Error computing distance_matrix for seat {seat}: {e}")
+                return
+
+            passenger = Passenger(
+                ped_id=self.ped_id_counter,
+                spawn_pos=door,
+                seat_pos=seat,
+                distance_matrix=distance_matrix,
+                baggage_probability=1
+            )
+            self.passengers.append(passenger)
+            self.seat_status[seat] = True  # Mark seat as occupied
+            print(f"Spawning Passenger {self.ped_id_counter} at {door} -> Seat {seat}")
+            self.ped_id_counter += 1
+
     def resolve_conflicts(self, move_requests):
         """
         Řeší konflikty, kdy více pasažérů chce vstoupit do stejné buňky.
@@ -445,9 +516,11 @@ class Simulation:
         """
         for passenger in self.passengers:
             passenger.move()
+
             # Kontrola, zda pasažér dosáhl sedadla
             if passenger.current_pos == passenger.seat_pos and not passenger.seated:
                 passenger.seated = True
+                self.seat_status[passenger.seat_pos] = True  # Mark seat as occupied
                 print(f"Passenger {passenger.ped_id} seated at {passenger.seat_pos}")
 
     def run(self):
@@ -469,7 +542,7 @@ class Simulation:
             occupied_positions = {p.current_pos for p in self.passengers if not p.seated}
             blocked_passengers = {}  # current_position : passenger - implemented to resolve passenger <-> passenger conflicts
             for passenger in self.passengers:
-                passenger.decide_move(occupied_positions, blocked_passengers)
+                passenger.decide_move(occupied_positions, blocked_passengers, self.seat_status)
 
             self.resolve_swapping(blocked_passengers)
 

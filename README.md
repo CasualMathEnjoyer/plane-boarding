@@ -34,13 +34,16 @@ colaboration project modeling boarding of a plane
   - `swapping`: Stav, kdy se pasažér vyměňuje s jiným pasažérem..
   - `swapping_speed`: Rychlost výměny při vyměňování v uličce.
   - `swapping_progress`: Počet kroků potřebných k dokončení výměny.
-  
+  - `seating_in_progress`: Informace, zda se uživatel dostává ke svému sedadlu přes již usazené pasažéry.
+  - `seating_steps_remaining`: Doba usazování závisí na počtu "blokujících sedadel".
+
 - **Logika Pohybu**:
   - Pasažéři se rozhodují o svém dalším kroku na základě nejkratší cesty k sedadlu.
   - Pokud má pasažér zavazadlo, zastaví se a uloží ho před pokračováním k sedadlu.
   - Konfliktní situace jsou řešeny tak, že pouze jeden pasažér může vstoupit do konkurenční buňky najednou.
   - Pokud jdou dva pasažéři proti sobě, vymění se.
-
+  - Pokud se chce uživatel usadit k oknu přes již obsazené místo v uličce, usazení trvá delší dobu. Po dobu usazování je ulička blokovaná
+  
 ### 3. Třída `Simulation`
 
 - **Účel**: Řídí celou simulaci, včetně inicializace letadla, pasažérů a vizualizace pomocí Pygame.
@@ -67,6 +70,7 @@ colaboration project modeling boarding of a plane
   - **Oranžová**: Aktivní pasažéři, kteří se pohybují k sedadlům.
   - **Zelená**: Usazení pasažéři.
   - **Azurová**: Pasažéři ukládající zavazadla.
+  - **Červená**: Pasažéři, kteří se právě usazují - dostávají ke svému zablokovanému sedadlu
   - **Růžová**: Pasažéři, kteří se právě vyměňují v uličce.
 - **Zavazadlo**: Pasažéři, kteri u sebe maji male příruční zavazadlo (zobrazeno modrým čtverečkem).
 
