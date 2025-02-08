@@ -660,7 +660,7 @@ def get_user_configuration():
                         help='Probability that a passenger has baggage (0.0 - 1.0)')
     parser.add_argument('--ticks_per_second', type=int, default=5,
                         help='Number of simulation ticks (frames) per second')
-    parser.add_argument('--seating_strategy', type=str, choices=['random', 'door_wise', 'window_wise', 'optimal'], default='optimal',
+    parser.add_argument('--seating_strategy', type=str, choices=['random', 'door_wise', 'window_wise', 'optimal'], default='random',
                         help='Seating strategy')
     args = parser.parse_args()
     return args
@@ -683,13 +683,14 @@ if __name__ == "__main__":
         seating_strategy=args.seating_strategy
     )
     time_to_finish, passenger_seated_at = simulation.run()
-    print(f'Simulace ukončena po {time_to_finish} krocích.')
+    print(f'Simulace ukončena po {time_to_finish/1000} sekundách.')
 
     # Zobrazení grafu
-    num_passengers = list(range(1, len(passenger_seated_at) + 1))
+    passenger_seated_at_seconds = [t / 1000 for t in passenger_seated_at]
+    num_passengers = list(range(1, len(passenger_seated_at_seconds) + 1))
     plt.figure(figsize=(8, 5))
-    plt.plot(passenger_seated_at, num_passengers, marker='o', linestyle='-', linewidth=2, color='b')
-    plt.xlabel("Čas [ticks]")
+    plt.plot(passenger_seated_at_seconds, num_passengers, marker='o', linestyle='-', linewidth=2, color='b')
+    plt.xlabel("Čas [s]")
     plt.ylabel("Počet usazených pasažérů")
     plt.title("Usazování pasažérů v čase")
     plt.grid(True)

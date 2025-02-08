@@ -89,11 +89,11 @@ Simulace se ukončí, když jsou všichni pasažéři spawnováni a usazeni na s
 Po ukončení simulace se vygeneruje graf ukazující usazování jednotlivých pasažérů v čase.
 <p align="center">
     <figure align="center">
-      <img src="./plots/randomSeating.png" width="45%" />
+      <img src="./plots/seatingRandom.png" width="45%" />
       <figcaption align="center">(Obr. 1) Náhodné usazování pasažérů</figcaption>
     </figure>
     <figure align="center">
-      <img src="./plots/optimalSeating.png" width="45%" />
+      <img src="./plots/seatingOptimal.png" width="45%" />
       <figcaption align="center">(Obr. 2) Usazování při zohlednění polohy sedadel vůči oknům a dveřím</figcaption>
     </figure>
 </p>
