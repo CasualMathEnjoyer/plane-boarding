@@ -1,7 +1,7 @@
 # Simulace usazování pasažérů do letadla
 Cílem projektu je nasimulovat různé podmínky ovlivňující rychlost usazování pasažérů v letadle
 
-**_Autoři: Michal Průšek, Kateřina Morovicsová, Filip Širc_**
+**_Autoři: Michal Průšek, Katka Morovicsová, Filip Širc_**
 
 ## Funkce
 
@@ -95,5 +95,9 @@ Po ukončení simulace se vygeneruje graf ukazující usazování jednotlivých 
     <figure align="center">
       <img src="./plots/seatingOptimal.png" width="45%" />
       <figcaption align="center">(Obr. 2) Usazování při zohlednění polohy sedadel vůči oknům a dveřím</figcaption>
+    </figure>
+  <figure align="center">
+      <img src="./plots/boxplot.png" width="45%" />
+      <figcaption align="center">(Obr. 3) Boxplot znázorňující porovnání různých strategií</figcaption>
     </figure>
 </p>
