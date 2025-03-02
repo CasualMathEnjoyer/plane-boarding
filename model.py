@@ -6,6 +6,7 @@ import pygame
 import random
 from collections import deque, defaultdict
 import argparse
+import time
 
 # Funkce pro výpočet distance matrix pomocí BFS
 def compute_distance_matrix(matrix, seat_pos):
@@ -282,6 +283,7 @@ class Simulation:
     def __init__(self, seat_rows=32, seat_in_row=[3, 3], door_choice='left',
                  baggage_probability=0.6, ticks_per_second=10,
                  seating_strategy='random'):
+        pygame.init()
         # Nastavení parametrů
         self.seat_rows = seat_rows
         self.seat_in_row = seat_in_row
@@ -583,6 +585,7 @@ class Simulation:
     def run(self):
         running = True
         clock = pygame.time.Clock()
+        start_time = time.time()
 
         while running:
             current_time = pygame.time.get_ticks()
@@ -645,8 +648,12 @@ class Simulation:
             # Časování simulace
             clock.tick(self.ticks_per_second)
 
+        final_tick_time = pygame.time.get_ticks()
+
         pygame.quit()
-        return pygame.time.get_ticks(), self.passenger_seated_at
+        end_time = time.time()
+
+        return end_time-start_time, final_tick_time, self.passenger_seated_at
 
 # Funkce pro načtení konfigurace od uživatele
 def get_user_configuration():
@@ -682,8 +689,9 @@ if __name__ == "__main__":
         ticks_per_second=args.ticks_per_second,
         seating_strategy=args.seating_strategy
     )
-    time_to_finish, passenger_seated_at = simulation.run()
-    print(f'Simulace ukončena po {time_to_finish/1000} sekundách.')
+    time_to_finish, final_tick_time, passenger_seated_at = simulation.run()
+    print(f'Simulace ukončena po {time_to_finish} sekundách.')
+    print(f"Simulation ticks: {final_tick_time}")
 
     # Zobrazení grafu
     passenger_seated_at_seconds = [t / 1000 for t in passenger_seated_at]
